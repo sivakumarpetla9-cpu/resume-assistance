@@ -36,7 +36,7 @@ export interface JobTarget {
 }
 
 export interface ATSDiagnostic {
-  overallScore: number;
+  overallScore: number | null;
   keywordScore: number;
   skillsScore: number;
   experienceScore: number;
@@ -136,12 +136,13 @@ export interface SkillGapItem {
   id: string;
   skillName: string;
   status: 'strong' | 'intermediate' | 'missing';
+  priority?: string;
   jobRequirement: string;
   candidateEvidence: string;
   whyItMatters: string;
   howToImprove: string;
   practiceProject: string;
-  resources: { name: string; type: 'Course' | 'Docs' | 'Tutorial'; url: string }[];
+  resources?: { name: string; type: 'Course' | 'Docs' | 'Tutorial'; url: string }[];
 }
 
 export interface LearningRoadmapStep {

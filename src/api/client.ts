@@ -105,6 +105,13 @@ export class StitchAPI {
     return this.handleResponse(res);
   }
 
+  static async getLatestATS(jobId: string) {
+    const res = await fetch(`${API_BASE}/jobs/${jobId}/ats/latest`, {
+      headers: this.getHeaders()
+    });
+    return this.handleResponse(res);
+  }
+
   // AI Resume Tailoring API with Guardrails
   static async tailorResume(jobId: string, skills: string[]) {
     const res = await fetch(`${API_BASE}/jobs/${jobId}/tailor`, {
@@ -139,8 +146,26 @@ export class StitchAPI {
     return this.handleResponse(res);
   }
 
+  static async verifySkill(skillName: string) {
+    const res = await fetch(`${API_BASE}/skills/verify`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ skill_name: skillName })
+    });
+    return this.handleResponse(res);
+  }
+
   static async getRoadmap() {
     const res = await fetch(`${API_BASE}/learning/roadmap`, { headers: this.getHeaders() });
+    return this.handleResponse(res);
+  }
+
+  static async updateLearningItemStatus(itemId: string, status: string = 'COMPLETED') {
+    const res = await fetch(`${API_BASE}/learning/items/${itemId}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ status })
+    });
     return this.handleResponse(res);
   }
 

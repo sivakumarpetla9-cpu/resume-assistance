@@ -10,6 +10,7 @@ class SkillGap(Base):
     job_target_id = Column(String, ForeignKey("job_targets.id", ondelete="CASCADE"), nullable=False, index=True)
     skill_name = Column(String, nullable=False, index=True)
     status = Column(String, nullable=False) # 'strong', 'intermediate', 'missing'
+    priority = Column(String, nullable=True, default="HIGH") # 'HIGH', 'MEDIUM', 'LOW'
     job_requirement = Column(Text, nullable=False)
     candidate_evidence = Column(Text, nullable=True)
     why_it_matters = Column(Text, nullable=False)

@@ -9,6 +9,7 @@ from app.db.database import engine
 from app.db.base import Base
 from app.db.session import get_db
 from app.core.dependencies import get_current_user, verify_owner
+import app.models
 from app.models import User, Resume
 from app.websocket.interview import InterviewWebSocketHandler
 from app.api import (
