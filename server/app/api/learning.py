@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.core.dependencies import get_current_user
-from app.models import User, LearningRoadmap, LearningItem, SkillGap, JobTarget
+from app.models import User, LearningRoadmap, LearningItem
 
 router = APIRouter(prefix="/learning", tags=["Learning Roadmap"])
 
