@@ -52,11 +52,11 @@ def update_learning_item(
 ):
     item = db.query(LearningItem).filter(LearningItem.id == item_id).first()
     if not item:
-        raise HTTPException(status_code=404, detail="Learning item not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Learning item not found.")
 
     roadmap = db.query(LearningRoadmap).filter(LearningRoadmap.id == item.roadmap_id).first()
     if not roadmap or roadmap.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Forbidden: Item does not belong to user.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Item does not belong to user.")
 
     item.status = req.status
     db.commit()

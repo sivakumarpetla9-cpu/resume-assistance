@@ -1,5 +1,5 @@
 import uuid
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.db.session import get_db
@@ -43,6 +43,11 @@ def verify_skill(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    if not req.skill_name or not req.skill_name.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Skill name is required."
+        )
     profile = db.query(CareerProfile).filter(CareerProfile.user_id == current_user.id).first()
     if not profile:
         profile = CareerProfile(id=f"prof-{uuid.uuid4().hex[:8]}", user_id=current_user.id)
