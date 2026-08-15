@@ -205,34 +205,11 @@ export class StitchAPI {
 
   // AI Career Assistant API
   static async chatAssistant(page: string, message: string) {
-    try {
-      const res = await fetch(`${API_BASE}/assistant/chat`, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify({ page, message })
-      });
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch (err) {
-      // Intelligent fallback engine when backend request is unavailable
-    }
-
-    const lower = message.toLowerCase();
-    let reply = `[STITCH AI] Context (${page.toUpperCase()}): `;
-
-    if (lower.includes('ats') || lower.includes('score') || page === 'ats-console') {
-      reply += "Your ATS score is calculated by cross-matching your verified experience against target job keywords. Verifying missing core skills will immediately boost your match rating.";
-    } else if (lower.includes('interview') || lower.includes('voice') || page.includes('interview')) {
-      reply += "Our AI Voice Telemetry engine monitors your speech speed (target 130-160 WPM), filler word count, and structural clarity. Practice targeted STAR responses to maximize readiness.";
-    } else if (lower.includes('resume') || lower.includes('tailor') || page.includes('resume')) {
-      reply += "The Resume Tailoring engine rewrites bullet points to match target job criteria while enforcing strict non-fabrication guardrails. No unbacked skills are ever hallucinated.";
-    } else if (lower.includes('skill') || lower.includes('roadmap') || page.includes('skill')) {
-      reply += "Your Skill Gap analysis prioritizes high-impact missing requirements. Completing roadmap practice tasks converts weak keywords into verified profile skills.";
-    } else {
-      reply += `I have processed your query regarding "${message}". Based on your target role, I recommend focusing on verifying core skills and completing mock interview practice.`;
-    }
-
-    return { reply };
+    const res = await fetch(`${API_BASE}/assistant/chat`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ page, message })
+    });
+    return this.handleResponse(res);
   }
 }

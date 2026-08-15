@@ -1,22 +1,30 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from openai import OpenAI
+from typing import Dict, Any
 
 from app.db.session import get_db
 from app.core.dependencies import get_current_user
 from app.models import (
     User,
     CareerProfile,
+    UserSkill,
     JobTarget,
+    JobRequirement,
     ATSAnalysis,
     SkillGap,
     InterviewSession,
+    InterviewFeedback,
     Resume,
     ResumeVersion,
-    LearningRoadmap
+    Experience,
+    Project,
+    LearningRoadmap,
+    LearningItem,
+    Application
 )
 from app.core.config import settings
+from app.services.ai_providers import OpenAIProvider, DevelopmentAIProvider
 
 
 router = APIRouter(
@@ -26,7 +34,7 @@ router = APIRouter(
 
 
 class ChatRequest(BaseModel):
-    page: str = "dashboard"
+    page: str = "command-center"
     message: str
 
 
@@ -43,18 +51,46 @@ class CareerContextBuilder:
         user_id: str,
         page: str,
         db: Session
-    ) -> dict:
+    ) -> Dict[str, Any]:
 
         user = db.query(User).filter(User.id == user_id).first()
         profile = db.query(CareerProfile).filter(CareerProfile.user_id == user_id).first()
-        job = db.query(JobTarget).filter(JobTarget.user_id == user_id).first()
-        resume = db.query(Resume).filter(Resume.user_id == user_id).first()
-        version = (
-            db.query(ResumeVersion)
-            .filter(ResumeVersion.resume_id == resume.id)
+        
+        user_skills = []
+        if profile:
+            skills_recs = db.query(UserSkill).filter(UserSkill.profile_id == profile.id).all()
+            user_skills = [{"name": s.skill_name, "verified": s.is_verified} for s in skills_recs]
+
+        job = (
+            db.query(JobTarget)
+            .filter(JobTarget.user_id == user_id)
+            .order_by(JobTarget.created_at.desc())
             .first()
-            if resume else None
         )
+
+        resume = (
+            db.query(Resume)
+            .filter(Resume.user_id == user_id)
+            .order_by(Resume.created_at.desc())
+            .first()
+        )
+
+        version = None
+        experiences = []
+        projects = []
+        if resume:
+            version = (
+                db.query(ResumeVersion)
+                .filter(ResumeVersion.resume_id == resume.id)
+                .order_by(ResumeVersion.created_at.desc())
+                .first()
+            )
+            if version:
+                exp_recs = db.query(Experience).filter(Experience.version_id == version.id).all()
+                experiences = [{"title": e.title, "company": e.company, "period": e.period} for e in exp_recs]
+
+                proj_recs = db.query(Project).filter(Project.version_id == version.id).all()
+                projects = [{"name": p.name, "tech_stack": p.tech_stack} for p in proj_recs]
 
         ats = (
             db.query(ATSAnalysis)
@@ -63,7 +99,34 @@ class CareerContextBuilder:
             if job else None
         )
 
-        gaps = db.query(SkillGap).filter(SkillGap.user_id == user_id).all()
+        gaps = (
+            db.query(SkillGap)
+            .filter(SkillGap.job_target_id == job.id)
+            .all()
+            if job else []
+        )
+        skill_gaps = [
+            {
+                "skillName": g.skill_name,
+                "status": g.status,
+                "priority": g.priority or "HIGH"
+            }
+            for g in gaps
+        ]
+
+        roadmap = db.query(LearningRoadmap).filter(LearningRoadmap.user_id == user_id).first()
+        roadmap_items = []
+        if roadmap:
+            items = db.query(LearningItem).filter(LearningItem.roadmap_id == roadmap.id).order_by(LearningItem.order).all()
+            roadmap_items = [
+                {
+                    "title": item.title,
+                    "category": item.category,
+                    "status": item.status
+                }
+                for item in items
+            ]
+
         interview = (
             db.query(InterviewSession)
             .filter(InterviewSession.job_target_id == job.id)
@@ -71,17 +134,49 @@ class CareerContextBuilder:
             if job else None
         )
 
+        apps = db.query(Application).filter(Application.user_id == user_id).all()
+        applications = [{"company": a.company, "role": a.role, "stage": a.stage} for a in apps]
+
+        # Truncate summary snippet safely for context efficiency
+        resume_summary = version.summary if version and version.summary else (resume.parsed_summary if resume else None)
+        if resume_summary and len(resume_summary) > 300:
+            resume_summary = resume_summary[:300] + "..."
+
+        job_desc_summary = job.description[:250] + "..." if job and job.description and len(job.description) > 250 else (job.description if job else None)
+
         return {
-            "user_name": user.name if user else "Candidate",
-            "page": page,
-            "overall_readiness": profile.overall_readiness_score if profile else None,
-            "target_job": job.title if job else "Not set",
-            "target_company": job.company if job else "Not set",
-            "resume_summary": version.summary if version and version.summary else (resume.parsed_summary if resume else None),
-            "ats_score": ats.overall_score if ats else None,
-            "interview_score": interview.overall_readiness_score if interview else None,
-            "skill_gaps_count": len(gaps),
-            "missing_skills": [g.skill_name for g in gaps if g.status == "missing"]
+            "user": {
+                "name": user.name if user else "Candidate",
+                "target_role": user.target_role if user else "Software Engineer"
+            },
+            "career_profile": {
+                "overall_readiness": profile.overall_readiness_score if profile else None,
+                "resume_score": profile.resume_score if profile else None
+            },
+            "resume": {
+                "available": bool(resume),
+                "file_name": resume.file_name if resume else None,
+                "extracted_text_summary": resume_summary
+            },
+            "skills": user_skills,
+            "experience": experiences,
+            "projects": projects,
+            "job_target": {
+                "title": job.title if job else None,
+                "company": job.company if job else None,
+                "description_summary": job_desc_summary
+            },
+            "ats": {
+                "score": ats.overall_score if ats else None,
+                "matched_skills": ats.matched_keywords if ats else [],
+                "missing_skills": ats.missing_keywords if ats else []
+            },
+            "skill_gaps": skill_gaps,
+            "roadmap": roadmap_items,
+            "interview": {
+                "readiness": interview.overall_readiness_score if interview else None
+            },
+            "applications": applications
         }
 
 
@@ -100,80 +195,41 @@ def assistant_chat(
         db
     )
 
-    # If OpenAI API Key is configured, use OpenAI
-    if settings.AI_API_KEY and settings.AI_API_KEY.strip():
-        try:
-            client = OpenAI(api_key=settings.AI_API_KEY)
-            
-            missing_skills_str = ", ".join(ctx["missing_skills"]) if ctx["missing_skills"] else "None identified"
-            readiness_str = f"{ctx['overall_readiness']}%" if ctx['overall_readiness'] is not None else "Not calculated"
-            ats_str = f"{ctx['ats_score']}%" if ctx['ats_score'] is not None else "Not calculated"
-            resume_info = ctx["resume_summary"] if ctx["resume_summary"] else "No resume uploaded yet"
+    is_openai_mode = settings.AI_PROVIDER.lower() == "openai" or bool(settings.AI_API_KEY and settings.AI_API_KEY.strip())
 
-            system_prompt = f"""You are STITCH AI Career Assistant, an intelligent career strategist.
-
-User Information:
-- Candidate Name: {ctx["user_name"]}
-- Active Workspace Page: {ctx["page"]}
-- Target Role: {ctx["target_job"]}
-- Target Company: {ctx["target_company"]}
-- Resume Summary: {resume_info}
-- Overall Readiness: {readiness_str}
-- ATS Score: {ats_str}
-- Missing Skills: {missing_skills_str}
-
-Rules:
-- Give practical, professional answers tailored to the user's active page ({ctx['page']}).
-- Do NOT fabricate candidate experience or claim skills that are not present.
-- If data (like resume or ATS score) is unavailable, politely inform the user to upload their resume or set a job target.
-"""
-
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": req.message}
-                ],
-                temperature=0.7,
-                max_tokens=600
+    if is_openai_mode:
+        if not settings.AI_API_KEY or not settings.AI_API_KEY.strip():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="AI service is temporarily unavailable. OPENAI_API_KEY is not configured on the backend."
             )
 
-            reply = response.choices[0].message.content
-            if reply:
-                return {
-                    "page": req.page,
-                    "reply": reply,
-                    "context_used": ctx
-                }
+        try:
+            provider = OpenAIProvider(api_key=settings.AI_API_KEY)
+            reply = provider.chat_assistant(req.page, req.message, ctx)
         except Exception as exc:
-            print("OpenAI API call failed, using intelligent context fallback:", exc)
-
-    # Contextual structured fallback when OpenAI key is unconfigured or call fails
-    page_lower = req.page.lower()
-    msg_lower = req.message.lower()
-
-    if "ats" in page_lower or "ats" in msg_lower:
-        if ctx["ats_score"] is not None:
-            reply = f"Your current ATS score for {ctx['target_job']} at {ctx['target_company']} is {ctx['ats_score']}%. Verifying missing core skills like {', '.join(ctx['missing_skills'][:2]) if ctx['missing_skills'] else 'key requirements'} will boost your match fit."
-        else:
-            reply = f"To generate your ATS diagnostic score for {ctx['target_job']}, please upload your resume and set a primary target job."
-    elif "interview" in page_lower or "interview" in msg_lower:
-        reply = f"In the AI Interview Room for {ctx['target_job']}, we evaluate speech telemetry (130-160 WPM), filler word count, and structural clarity. Practice your STAR method responses to boost readiness."
-    elif "resume" in page_lower or "resume" in msg_lower:
-        if ctx["resume_summary"]:
-            reply = f"Your uploaded resume summary is indexed: '{ctx['resume_summary'][:150]}...'. In Resume Studio, we tailor bullet points against target job requirements with non-fabrication guardrails."
-        else:
-            reply = "Upload your PDF or DOCX resume document in the Resume Upload workspace to begin semantic keyword parsing and automated bullet tailoring."
-    elif "skill" in page_lower or "roadmap" in page_lower:
-        if ctx["missing_skills"]:
-            reply = f"We have identified {ctx['skill_gaps_count']} skill gaps for {ctx['target_job']}: {', '.join(ctx['missing_skills'])}. Completing practice tasks on your roadmap will convert these into verified skills."
-        else:
-            reply = "No active skill gaps identified. Continue completing roadmap practice tasks to maintain high candidate readiness."
+            print(f"OpenAI Assistant Error: {exc}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="AI service is temporarily unavailable. Please try again."
+            )
     else:
-        reply = f"Hello {ctx['user_name']}! I am tracking your context for {ctx['target_job']} on the {req.page} workspace. How can I assist you with your resume, ATS diagnostic, or interview preparation today?"
+        # Development mode fallback
+        provider = DevelopmentAIProvider()
+        reply = provider.chat_assistant(req.page, req.message, ctx)
+
+    # Clean context_used for response (excluding verbose data)
+    clean_ctx = {
+        "user_name": ctx["user"]["name"],
+        "target_role": ctx["job_target"]["title"] or ctx["user"]["target_role"],
+        "target_company": ctx["job_target"]["company"],
+        "ats_score": ctx["ats"]["score"],
+        "missing_skills": ctx["ats"]["missing_skills"],
+        "skill_gaps_count": len(ctx["skill_gaps"])
+    }
 
     return {
         "page": req.page,
         "reply": reply,
-        "context_used": ctx
+        "context_used": clean_ctx
     }
