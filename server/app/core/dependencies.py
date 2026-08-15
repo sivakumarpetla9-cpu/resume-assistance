@@ -18,27 +18,26 @@ def get_current_user(
         jwt_token = authorization.split(" ")[1]
 
     if not jwt_token:
-        # Fallback default demo user if unauthenticated in dev
-        demo_user = db.query(User).filter(User.id == "demo-user-1").first()
-        if demo_user:
-            return demo_user
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication token required"
+            detail="Authentication token required",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
     user_id = decode_access_token(jwt_token)
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication token"
+            detail="Invalid or expired authentication token",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found"
+            detail="User account not found",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
     return user

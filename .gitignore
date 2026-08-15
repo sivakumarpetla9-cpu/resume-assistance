@@ -29,6 +29,8 @@ __pycache__/
 .pytest_cache/
 *.db
 *.sqlite3
+*.backup
+alembic_new/
 venv/
 .env
 

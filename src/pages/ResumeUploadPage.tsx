@@ -1,118 +1,275 @@
 import React, { useState } from 'react';
+import { Upload, CheckCircle2, Cpu, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
+import { StitchAPI } from '../api/client';
 import { useCareer } from '../store/CareerContext';
-import { Upload, CheckCircle2, Cpu, ArrowRight, Sparkles } from 'lucide-react';
 
 export const ResumeUploadPage: React.FC = () => {
-  const { setActiveScreen, showToast } = useCareer();
-  const [status, setStatus] = useState<'idle' | 'processing' | 'ready'>('idle');
-  const [currentStep, setCurrentStep] = useState(0);
+  const { updateProfile, setActiveScreen } = useCareer();
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploaded, setUploaded] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [extractedSkills, setExtractedSkills] = useState<string[]>([]);
+  const [wordCount, setWordCount] = useState<number>(0);
 
-  const processingSteps = [
-    'Uploading document file...',
-    'Reading binary PDF/DOCX stream...',
-    'Parsing document layout & hierarchy...',
-    'Extracting candidate work experience & dates...',
-    'Analyzing skill keywords & project evidence...',
-    'Indexing semantic profile against ATS rules...'
-  ];
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-  const handleSimulatedUpload = () => {
-    setStatus('processing');
-    setCurrentStep(0);
+    const allowedTypes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
+    const validExtension =
+      file.name.toLowerCase().endsWith('.pdf') ||
+      file.name.toLowerCase().endsWith('.docx');
 
-    const interval = setInterval(() => {
-      setCurrentStep(prev => {
-        if (prev >= processingSteps.length - 1) {
-          clearInterval(interval);
-          setStatus('ready');
-          showToast("Resume parsed and indexed successfully");
-          return prev;
-        }
-        return prev + 1;
+    if (!allowedTypes.includes(file.type) && !validExtension) {
+      setErrorMessage('Please select a valid PDF (.pdf) or DOCX (.docx) document file.');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setErrorMessage('File size must be smaller than 10MB.');
+      return;
+    }
+
+    setSelectedFile(file);
+    setUploaded(false);
+    setStatusMessage('');
+    setErrorMessage('');
+    setExtractedSkills([]);
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) {
+      setErrorMessage('Please select your resume file first.');
+      return;
+    }
+
+    try {
+      setUploading(true);
+      setErrorMessage('');
+      setStatusMessage('Uploading document file and executing real text extraction...');
+
+      const result = await StitchAPI.uploadResume(selectedFile);
+
+      setUploaded(true);
+      setStatusMessage(`Resume "${selectedFile.name}" parsed successfully. Extracted ${result.word_count || 0} words.`);
+      setExtractedSkills(result.extracted_skills || []);
+      setWordCount(result.word_count || 0);
+
+      // Update global context profile
+      updateProfile({
+        resumeUploaded: true,
+        resumeFileName: selectedFile.name,
+        skills: result.extracted_skills?.length ? result.extracted_skills : undefined
       });
-    }, 700);
+
+    } catch (error) {
+      console.error('Resume upload error:', error);
+      setUploaded(false);
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'Resume upload failed. Please verify the backend server is running and try again.'
+      );
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-12 space-y-8 animate-fade-in">
-      <div className="text-center space-y-2">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#111822] border border-[#35C6FF]/40 text-xs font-mono text-[#35C6FF]">
-          <Cpu className="w-3.5 h-3.5" />
-          SEMANTIC RESUME PARSER v2.4
+    <div className="min-h-screen bg-[#080B10] text-[#F3F5F7] p-6 sm:p-8">
+      <div className="max-w-4xl mx-auto space-y-8">
+
+        {/* Header */}
+        <div>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2.5 rounded-xl bg-[#111720] border border-[#27303D]">
+              <Sparkles className="w-5 h-5 text-[#35C6FF]" />
+            </div>
+            <span className="text-xs font-mono font-bold tracking-widest text-[#35C6FF] uppercase">
+              STITCH CAREER INTELLIGENCE
+            </span>
+          </div>
+
+          <h1 className="text-3xl font-bold text-[#F3F5F7] font-mono">
+            Upload Resume Document
+          </h1>
+
+          <p className="mt-2 text-sm text-[#A7B0BC]">
+            Upload your existing PDF or DOCX resume for real text extraction, keyword density indexing, and guardrail ATS tailoring.
+          </p>
         </div>
-        <h1 className="text-3xl font-bold text-[#F3F5F7]">Upload Resume Document</h1>
-        <p className="text-xs text-[#A7B0BC]">
-          Upload your existing resume file for structural extraction, keyword density indexing, and AI tailoring.
-        </p>
-      </div>
 
-      <div className="bg-[#0C1118] border border-[#1C2633] rounded-2xl p-8 shadow-xl">
-        {status === 'idle' && (
-          <div
-            onClick={handleSimulatedUpload}
-            className="border-2 border-dashed border-[#1C2633] hover:border-[#35C6FF] rounded-2xl p-12 bg-[#111822]/40 transition-all cursor-pointer flex flex-col items-center justify-center space-y-4 group"
+        {/* Upload Card */}
+        <div className="rounded-2xl border border-[#27303D] bg-[#0E131A] p-8 space-y-6 shadow-xl">
+
+          <input
+            id="resume-upload"
+            type="file"
+            accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+
+          <label
+            htmlFor="resume-upload"
+            className="block cursor-pointer"
           >
-            <div className="w-16 h-16 rounded-2xl bg-[#35C6FF]/10 border border-[#35C6FF]/30 text-[#35C6FF] flex items-center justify-center group-hover:scale-110 transition-transform shadow-[0_0_20px_rgba(53,198,255,0.2)]">
-              <Upload className="w-8 h-8" />
+            <div
+              className={`border-2 border-dashed rounded-2xl p-10 text-center transition-all ${
+                selectedFile
+                  ? 'border-[#35C6FF] bg-[#111720]'
+                  : 'border-[#27303D] hover:border-[#35C6FF] hover:bg-[#111720]'
+              }`}
+            >
+              {uploaded ? (
+                <div className="space-y-3">
+                  <CheckCircle2 className="w-12 h-12 mx-auto text-[#35D399]" />
+                  <h2 className="text-xl font-bold text-[#F3F5F7] font-mono">
+                    Resume Uploaded & Parsed
+                  </h2>
+                  <p className="text-sm font-mono text-[#35C6FF]">
+                    {selectedFile?.name} ({(selectedFile ? selectedFile.size / 1024 / 1024 : 0).toFixed(2)} MB)
+                  </p>
+                  <p className="text-xs text-[#A7B0BC]">
+                    Extracted {wordCount} words from document file.
+                  </p>
+                </div>
+              ) : selectedFile ? (
+                <div className="space-y-3">
+                  <CheckCircle2 className="w-12 h-12 mx-auto text-[#35C6FF]" />
+                  <h2 className="text-xl font-bold font-mono text-[#F3F5F7]">
+                    {selectedFile.name}
+                  </h2>
+                  <p className="text-xs font-mono text-[#A7B0BC]">
+                    {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
+                  <p className="text-xs font-mono text-[#35C6FF] underline">
+                    Click to choose a different file
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Upload className="w-12 h-12 mx-auto text-[#35C6FF]" />
+                  <h2 className="text-xl font-bold font-mono text-[#F3F5F7]">
+                    Select Resume File
+                  </h2>
+                  <p className="text-xs text-[#A7B0BC]">
+                    PDF or DOCX format supported
+                  </p>
+                  <p className="text-[11px] font-mono text-[#66717F]">
+                    Maximum file size: 10MB
+                  </p>
+                </div>
+              )}
             </div>
-            <div className="text-center space-y-1">
-              <div className="font-mono font-bold text-base text-[#F3F5F7]">
-                Drag and drop your resume file here
+          </label>
+
+          {/* Status Message */}
+          {statusMessage && (
+            <div className="rounded-xl border border-[#35D399]/40 bg-[#35D399]/10 p-4 text-xs font-mono text-[#35D399]">
+              ✓ {statusMessage}
+            </div>
+          )}
+
+          {/* Error Message */}
+          {errorMessage && (
+            <div className="rounded-xl border border-[#F06A6A]/40 bg-[#F06A6A]/10 p-4 text-xs font-mono text-[#F06A6A] flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          {/* Extracted Skills Badges */}
+          {extractedSkills.length > 0 && (
+            <div className="space-y-2 pt-2 border-t border-[#27303D]">
+              <div className="text-xs font-mono text-[#A7B0BC]">EXTRACTED SKILLS FROM RESUME:</div>
+              <div className="flex flex-wrap gap-2">
+                {extractedSkills.map((sk, idx) => (
+                  <span key={idx} className="px-2.5 py-1 rounded bg-[#111720] border border-[#35C6FF]/30 text-xs font-mono text-[#35C6FF]">
+                    ✓ {sk}
+                  </span>
+                ))}
               </div>
-              <div className="text-xs text-[#A7B0BC]">Supports PDF, DOCX (Up to 10MB)</div>
             </div>
-            <button className="px-5 py-2.5 rounded-xl bg-[#35C6FF] text-[#070A0F] font-mono font-bold text-xs hover:bg-[#35C6FF]/90 transition-all">
-              Browse Local Files
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <button
+              type="button"
+              onClick={handleUpload}
+              disabled={!selectedFile || uploading}
+              className="flex-1 flex items-center justify-center gap-2.5 rounded-xl bg-[#35C6FF] text-[#070A0F] px-6 py-3.5 font-mono font-bold text-xs hover:bg-[#35C6FF]/90 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(53,198,255,0.3)]"
+            >
+              {uploading ? (
+                <>
+                  <Cpu className="w-4 h-4 animate-spin" />
+                  <span>UPLOADING & PARSING DOCUMENT...</span>
+                </>
+              ) : uploaded ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>RE-UPLOAD DOCUMENT</span>
+                </>
+              ) : (
+                <>
+                  <span>UPLOAD & PARSE RESUME</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
+
+            {uploaded && (
+              <button
+                type="button"
+                onClick={() => setActiveScreen('command-center')}
+                className="flex items-center justify-center gap-2 rounded-xl bg-[#111720] border border-[#35C6FF]/50 text-[#35C6FF] px-6 py-3.5 font-mono font-bold text-xs hover:bg-[#35C6FF]/10 transition-all"
+              >
+                <span>CONTINUE TO COMMAND CENTER</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            )}
           </div>
-        )}
 
-        {status === 'processing' && (
-          <div className="py-12 space-y-8 text-center max-w-md mx-auto">
-            <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
-              <div className="absolute inset-0 rounded-full border-4 border-[#1C2633]" />
-              <div className="absolute inset-0 rounded-full border-4 border-[#35C6FF] border-t-transparent animate-spin" />
-              <Sparkles className="w-8 h-8 text-[#35C6FF] animate-pulse" />
-            </div>
-
-            <div className="space-y-3">
-              <div className="font-mono text-sm font-bold text-[#F3F5F7]">
-                {processingSteps[currentStep]}
-              </div>
-              <div className="w-full h-2 rounded-full bg-[#111822] overflow-hidden">
-                <div
-                  className="h-full bg-[#35C6FF] transition-all duration-500 rounded-full"
-                  style={{ width: `${((currentStep + 1) / processingSteps.length) * 100}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {status === 'ready' && (
-          <div className="py-8 text-center space-y-6 max-w-md mx-auto">
-            <div className="w-16 h-16 rounded-2xl bg-[#35D399]/10 border border-[#35D399]/40 text-[#35D399] flex items-center justify-center mx-auto shadow-[0_0_25px_rgba(53,211,153,0.3)]">
-              <CheckCircle2 className="w-8 h-8" />
-            </div>
-
-            <div className="space-y-1">
-              <h2 className="text-xl font-bold text-[#F3F5F7]">Resume Indexed Successfully</h2>
-              <p className="text-xs text-[#A7B0BC]">
-                Extracted 2 Experience entries, 7 Skills, and 1 Project.
+          {/* Feature Grid */}
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-[#27303D]">
+            <div className="rounded-xl border border-[#27303D] bg-[#111720] p-4 space-y-1">
+              <Cpu className="w-5 h-5 text-[#35C6FF] mb-2" />
+              <h3 className="font-mono font-bold text-xs text-[#F3F5F7]">
+                Real Text Extraction
+              </h3>
+              <p className="text-[11px] text-[#A7B0BC]">
+                Parses genuine PDF and DOCX text without fallback placeholders.
               </p>
             </div>
 
-            <div className="flex justify-center gap-3">
-              <button
-                onClick={() => setActiveScreen('resume-studio')}
-                className="px-6 py-3 rounded-xl bg-[#35C6FF] text-[#070A0F] font-mono font-bold text-xs hover:bg-[#35C6FF]/90 transition-all flex items-center gap-2"
-              >
-                <span>OPEN RESUME STUDIO</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+            <div className="rounded-xl border border-[#27303D] bg-[#111720] p-4 space-y-1">
+              <Sparkles className="w-5 h-5 text-[#4F7CFF] mb-2" />
+              <h3 className="font-mono font-bold text-xs text-[#F3F5F7]">
+                Skill Indexing
+              </h3>
+              <p className="text-[11px] text-[#A7B0BC]">
+                Indexes core technical skills for ATS keyword matching.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-[#27303D] bg-[#111720] p-4 space-y-1">
+              <CheckCircle2 className="w-5 h-5 text-[#35D399] mb-2" />
+              <h3 className="font-mono font-bold text-xs text-[#F3F5F7]">
+                Database Storage
+              </h3>
+              <p className="text-[11px] text-[#A7B0BC]">
+                Stores parsed resume versions under your candidate account.
+              </p>
             </div>
           </div>
-        )}
+
+        </div>
       </div>
     </div>
   );

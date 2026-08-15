@@ -1,32 +1,46 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from app.db.session import get_db
+from app.core.dependencies import get_current_user
+from app.models import User, LearningRoadmap, LearningItem
 
 router = APIRouter(prefix="/learning", tags=["Learning Roadmap"])
 
 @router.get("/roadmap")
-def get_learning_roadmap():
+def get_learning_roadmap(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    roadmap = db.query(LearningRoadmap).filter(LearningRoadmap.user_id == current_user.id).first()
+    if not roadmap:
+        return []
+
+    items = db.query(LearningItem).filter(LearningItem.roadmap_id == roadmap.id).order_by(LearningItem.order).all()
     return [
         {
-            "id": "step-1",
-            "title": "TypeScript Foundations & Strict Props",
-            "category": "Language",
-            "status": "completed",
-            "rationale": "Mandatory foundation before applying to TypeScript-first engineering teams.",
-            "estimatedHours": 4,
-            "practiceTask": "Type all state hooks and API responses in sample workspace.",
-            "order": 1
-        },
-        {
-            "id": "step-2",
-            "title": "TypeScript Generics & Utility Types",
-            "category": "Language",
-            "status": "in_progress",
-            "rationale": "Required to answer technical interview question 03 confidently.",
-            "estimatedHours": 6,
-            "practiceTask": "Create a reusable generic table component <DataTable<T>> with sorted columns.",
-            "order": 2
+            "id": item.id,
+            "title": item.title,
+            "category": item.category,
+            "status": item.status,
+            "rationale": item.rationale,
+            "estimatedHours": item.estimated_hours,
+            "practiceTask": item.practice_task,
+            "order": item.order
         }
+        for item in items
     ]
 
 @router.put("/items/{item_id}")
-def update_learning_item(item_id: str):
-    return {"id": item_id, "status": "completed", "message": "Updated learning item status"}
+def update_learning_item(
+    item_id: str,
+    status_val: str = "completed",
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    item = db.query(LearningItem).filter(LearningItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Learning item not found.")
+
+    item.status = status_val
+    db.commit()
+    return {"id": item.id, "status": item.status, "message": "Updated learning item status"}

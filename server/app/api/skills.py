@@ -1,28 +1,32 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from app.db.session import get_db
+from app.core.dependencies import get_current_user
+from app.models import User, JobTarget, SkillGap
 
 router = APIRouter(prefix="/skills", tags=["Skills & Skill Gaps"])
 
 @router.get("/gaps")
-def get_skill_gaps():
+def get_skill_gaps(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    jobs = db.query(JobTarget).filter(JobTarget.user_id == current_user.id).all()
+    job_ids = [j.id for j in jobs]
+    if not job_ids:
+        return []
+
+    gaps = db.query(SkillGap).filter(SkillGap.job_target_id.in_(job_ids)).all()
     return [
         {
-            "id": "sg-1",
-            "skillName": "TypeScript",
-            "status": "intermediate",
-            "jobRequirement": "Core requirement for Frontend Developer at XYZ Company.",
-            "candidateEvidence": "Basic exposure in personal project; missing from verified company work.",
-            "whyItMatters": "XYZ Company codebase is 100% strict TypeScript. Lacking verified depth creates ATS penalty.",
-            "howToImprove": "Build a typed component library and add typed props to React projects.",
-            "practiceProject": "Refactor Real-Time Telemetry Dashboard to Strict TypeScript"
-        },
-        {
-            "id": "sg-2",
-            "skillName": "WebSockets & Real-Time Sync",
-            "status": "intermediate",
-            "jobRequirement": "Required for XYZ live telemetry UI features.",
-            "candidateEvidence": "Used REST APIs extensively; single socket demo project.",
-            "whyItMatters": "Real-time communication is central to XYZ's flagship SaaS product.",
-            "howToImprove": "Implement WebSocket auto-reconnect, message framing, and state queueing.",
-            "practiceProject": "Build a WebSocket Live Telemetry Feed with Exponential Backoff"
+            "id": g.id,
+            "skillName": g.skill_name,
+            "status": g.status,
+            "jobRequirement": g.job_requirement,
+            "candidateEvidence": g.candidate_evidence,
+            "whyItMatters": g.why_it_matters,
+            "howToImprove": g.how_to_improve,
+            "practiceProject": g.practice_project
         }
+        for g in gaps
     ]
