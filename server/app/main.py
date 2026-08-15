@@ -26,7 +26,7 @@ app = FastAPI(
     description="STITCH — AI Career Intelligence Operating System Production API Suite",
     version="2.4.0",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    docs_url=f"{settings.API_V1_STR}/docs"
+    docs_url="/docs"
 )
 
 # CORS configuration
