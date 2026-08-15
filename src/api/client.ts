@@ -81,6 +81,12 @@ export class StitchAPI {
     return this.handleResponse(res);
   }
 
+  // Profile API
+  static async getProfile() {
+    const res = await fetch(`${API_BASE}/profile`, { headers: this.getHeaders() });
+    return this.handleResponse(res);
+  }
+
   // Job Target APIs
   static async getJobs() {
     const res = await fetch(`${API_BASE}/jobs`, { headers: this.getHeaders() });

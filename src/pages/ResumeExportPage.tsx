@@ -3,12 +3,17 @@ import { useCareer } from '../store/CareerContext';
 import { Download, CheckCircle2, History } from 'lucide-react';
 
 export const ResumeExportPage: React.FC = () => {
-  const { resumeVersion, activeJobTarget, showToast, setActiveScreen } = useCareer();
+  const { resumeVersion, activeJobTarget, profile, atsDiagnostic, showToast, setActiveScreen } = useCareer();
   const [selectedTemplate, setSelectedTemplate] = useState<'Minimal' | 'Technical' | 'Executive'>('Technical');
   const [selectedVersion, setSelectedVersion] = useState<'Original' | 'V1' | 'V2'>('V1');
 
+  const candidateName = profile.name || "Candidate";
+  const candidateEmail = profile.email || "candidate@example.com";
+  const candidateLocation = profile.location || "Remote";
+
   const handleDownload = () => {
-    showToast(`Downloading Alex_Vance_Resume_${selectedVersion}_${selectedTemplate}.pdf`);
+    const safeName = candidateName.replace(/\s+/g, '_');
+    showToast(`Downloading ${safeName}_Resume_${selectedVersion}_${selectedTemplate}.pdf`);
   };
 
   return (
@@ -25,7 +30,11 @@ export const ResumeExportPage: React.FC = () => {
             EXPORT ATS-COMPLIANT RESUME
           </h1>
           <p className="text-xs text-[#A7B0BC]">
-            Optimized for: <span className="font-mono text-[#35C6FF]">{activeJobTarget.title} — {activeJobTarget.company}</span>
+            Optimized for: {activeJobTarget ? (
+              <span className="font-mono text-[#35C6FF]">{activeJobTarget.title} — {activeJobTarget.company}</span>
+            ) : (
+              <span className="font-mono text-[#A7B0BC] italic">No active job target set</span>
+            )}
           </p>
         </div>
 
@@ -62,8 +71,8 @@ export const ResumeExportPage: React.FC = () => {
             <div className="space-y-2">
               {[
                 { id: 'Original', label: 'V0 — Base Resume', sub: 'Unmodified original upload' },
-                { id: 'V1', label: 'V1 — XYZ Tailored', sub: '82% ATS Match • Guardrails Verified' },
-                { id: 'V2', label: 'V2 — Technical Emphasis', sub: 'Emphasizes System Architecture' }
+                { id: 'V1', label: `V1 — ${activeJobTarget?.company || 'Target'} Tailored`, sub: atsDiagnostic.overallScore !== null ? `${atsDiagnostic.overallScore}% ATS Match • Guardrails Verified` : 'Un-analyzed ATS Version' },
+                { id: 'V2', label: 'V2 — Technical Emphasis', sub: 'Emphasizes Technical Experience & Skills' }
               ].map(ver => (
                 <div
                   key={ver.id}
@@ -124,13 +133,13 @@ export const ResumeExportPage: React.FC = () => {
         {/* Right Column: High Fidelity Document Preview */}
         <div className="lg:col-span-8 bg-[#0C1118] border border-[#1C2633] rounded-2xl p-8 shadow-2xl space-y-6 font-sans">
           
-          {/* Simulated PDF Sheet */}
+          {/* Document Sheet */}
           <div className="bg-[#FFFFFF] text-[#10151C] p-8 rounded-lg shadow-xl max-w-2xl mx-auto space-y-6 min-h-[680px]">
             {/* Header */}
             <div className="border-b border-[#E2E6EB] pb-4 text-center space-y-1">
-              <h1 className="text-2xl font-bold font-mono tracking-tight text-[#10151C]">ALEX VANCE</h1>
+              <h1 className="text-2xl font-bold font-mono tracking-tight text-[#10151C] uppercase">{candidateName}</h1>
               <p className="text-xs text-[#4B5563]">
-                San Francisco, CA • (555) 234-5678 • alex.vance@example.com • github.com/alexvance
+                {candidateLocation} • {candidateEmail}
               </p>
             </div>
 
@@ -140,29 +149,31 @@ export const ResumeExportPage: React.FC = () => {
                 PROFESSIONAL SUMMARY
               </h2>
               <p className="text-xs text-[#10151C] leading-relaxed">
-                {resumeVersion.summary}
+                {resumeVersion.summary || "Results-driven Software Engineer with experience crafting high-performance applications."}
               </p>
             </div>
 
             {/* Experience */}
-            <div className="space-y-3">
-              <h2 className="text-xs font-mono font-bold text-[#0099D8] tracking-wider uppercase border-b border-[#E2E6EB] pb-0.5">
-                WORK EXPERIENCE
-              </h2>
-              {resumeVersion.experience.map(exp => (
-                <div key={exp.id} className="space-y-1">
-                  <div className="flex justify-between font-mono text-xs font-bold text-[#10151C]">
-                    <span>{exp.title} — {exp.company}</span>
-                    <span className="text-[#4B5563]">{exp.period}</span>
+            {resumeVersion.experience && resumeVersion.experience.length > 0 && (
+              <div className="space-y-3">
+                <h2 className="text-xs font-mono font-bold text-[#0099D8] tracking-wider uppercase border-b border-[#E2E6EB] pb-0.5">
+                  WORK EXPERIENCE
+                </h2>
+                {resumeVersion.experience.map(exp => (
+                  <div key={exp.id} className="space-y-1">
+                    <div className="flex justify-between font-mono text-xs font-bold text-[#10151C]">
+                      <span>{exp.title} — {exp.company}</span>
+                      <span className="text-[#4B5563]">{exp.period}</span>
+                    </div>
+                    <ul className="list-disc list-inside text-[11px] text-[#4B5563] space-y-1 leading-relaxed">
+                      {(exp.tailoredBullets || exp.bullets).map((b, bIdx) => (
+                        <li key={bIdx}>{b}</li>
+                      ))}
+                    </ul>
                   </div>
-                  <ul className="list-disc list-inside text-[11px] text-[#4B5563] space-y-1 leading-relaxed">
-                    {(exp.tailoredBullets || exp.bullets).map((b, bIdx) => (
-                      <li key={bIdx}>{b}</li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
 
             {/* Skills */}
             <div className="space-y-1">
@@ -170,7 +181,7 @@ export const ResumeExportPage: React.FC = () => {
                 TECHNICAL SKILLS
               </h2>
               <p className="text-xs text-[#10151C] font-mono">
-                <span className="font-bold">Languages & Frameworks:</span> React, JavaScript, HTML5, CSS3, Tailwind CSS, REST APIs, Redux
+                <span className="font-bold">Verified Skills:</span> {profile.skills.length > 0 ? profile.skills.join(", ") : "React, JavaScript, Software Development"}
               </p>
             </div>
           </div>

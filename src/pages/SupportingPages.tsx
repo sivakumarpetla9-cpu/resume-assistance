@@ -1,24 +1,24 @@
 import React, { useState } from 'react';
 import { useCareer } from '../store/CareerContext';
-import { Layers, Target, FileText, Globe, Share2, Settings, Copy, Moon, Sun, ArrowRight, Plus, Trash2, RotateCcw } from 'lucide-react';
+import { Layers, FileText, Globe, Settings, Copy, Plus } from 'lucide-react';
 
 /* 1. APPLICATIONS TIMELINE TRACKER */
 export const ApplicationsPage: React.FC = () => {
-  const { applications, addApplication } = useCareer();
+  const { applications, addApplication, atsDiagnostic } = useCareer();
   const [showModal, setShowModal] = useState(false);
   const [company, setCompany] = useState('');
   const [role, setRole] = useState('');
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!company || !role) return;
-    addApplication({
+    await addApplication({
       company,
       role,
       stage: 'Applied',
       appliedDate: new Date().toISOString().split('T')[0],
-      matchScore: 82,
-      notes: 'Submitted tailored V1 resume.'
+      matchScore: atsDiagnostic.overallScore || 80,
+      notes: 'Logged application.'
     });
     setCompany('');
     setRole('');
@@ -90,108 +90,54 @@ export const ApplicationsPage: React.FC = () => {
 
       {/* Timeline List */}
       <div className="space-y-4">
-        {applications.map(app => (
-          <div key={app.id} className="p-5 rounded-2xl bg-[#0C1118] border border-[#1C2633] flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-3">
-                <h3 className="font-mono font-bold text-base text-[#F3F5F7]">{app.company}</h3>
-                <span className="px-2.5 py-0.5 rounded text-[10px] font-mono bg-[#35C6FF]/10 text-[#35C6FF] font-bold border border-[#35C6FF]/30">
-                  {app.matchScore}% MATCH FIT
-                </span>
-              </div>
-              <p className="text-xs text-[#A7B0BC]">{app.role} • Applied on {app.appliedDate}</p>
-              <p className="text-[11px] text-[#66717F] font-mono">{app.notes}</p>
-            </div>
-
-            {/* Stage Progress Pills */}
-            <div className="flex items-center gap-1 font-mono text-xs">
-              {['Applied', 'Assessment', 'Interview', 'Offer'].map((stg, sIdx) => {
-                const stages = ['Applied', 'Assessment', 'Interview', 'Offer'];
-                const currentIdx = stages.indexOf(app.stage);
-                const isPassed = sIdx <= currentIdx;
-
-                return (
-                  <span
-                    key={stg}
-                    className={`px-3 py-1 rounded-lg border text-[10px] font-bold ${
-                      isPassed
-                        ? 'bg-[#35D399]/10 border-[#35D399] text-[#35D399]'
-                        : 'bg-[#111822] border-[#1C2633] text-[#66717F]'
-                    }`}
-                  >
-                    {stg}
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-/* 2. JOB MATCHES MATRIX */
-export const JobMatchesPage: React.FC = () => {
-  const { jobTargets, setActiveJobTargetId, setActiveScreen } = useCareer();
-
-  return (
-    <div className="max-w-6xl mx-auto px-4 py-8 space-y-8 animate-fade-in">
-      <div className="p-6 rounded-2xl bg-[#0C1118] border border-[#1C2633] space-y-1">
-        <div className="flex items-center gap-2 text-xs font-mono text-[#35C6FF]">
-          <Target className="w-4 h-4" />
-          MULTI-ROLE FIT COMPARISON MATRIX
-        </div>
-        <h1 className="text-2xl font-bold font-mono text-[#F3F5F7]">JOB MATCH ANALYSIS</h1>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {jobTargets.map(job => (
-          <div key={job.id} className="p-6 rounded-2xl bg-[#0C1118] border border-[#1C2633] space-y-4">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-mono font-bold text-lg text-[#F3F5F7]">{job.title}</h3>
-                <p className="text-xs text-[#A7B0BC]">{job.company} • {job.location}</p>
-              </div>
-              <div className="font-mono text-2xl font-extrabold text-[#35C6FF]">{job.matchScore}%</div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-xs font-mono text-[#66717F]">MATCHED KEYWORDS:</div>
-              <div className="flex flex-wrap gap-1.5">
-                {job.requiredSkills.map((sk, idx) => (
-                  <span key={idx} className="px-2 py-0.5 rounded bg-[#111822] border border-[#1C2633] text-xs font-mono text-[#35D399]">
-                    ✓ {sk}
-                  </span>
-                ))}
-              </div>
-            </div>
-
+        {applications.length === 0 ? (
+          <div className="p-8 rounded-2xl bg-[#0C1118] border border-[#1C2633] text-center space-y-3">
+            <Layers className="w-10 h-10 mx-auto text-[#66717F]" />
+            <h3 className="text-sm font-mono font-bold text-[#F3F5F7]">No Applications Tracked Yet</h3>
+            <p className="text-xs text-[#A7B0BC] max-w-md mx-auto">
+              Log your active job application submissions to track status stages and interview timelines.
+            </p>
             <button
-              onClick={() => {
-                setActiveJobTargetId(job.id);
-                setActiveScreen('job-intelligence');
-              }}
-              className="w-full py-2.5 rounded-xl bg-[#151D28] border border-[#35C6FF]/40 text-[#35C6FF] font-mono text-xs font-bold hover:bg-[#35C6FF]/10 transition-colors flex items-center justify-center gap-2"
+              onClick={() => setShowModal(true)}
+              className="px-4 py-2 rounded-xl bg-[#35C6FF] text-[#070A0F] font-mono text-xs font-bold"
             >
-              <span>OPEN WORKSPACE FOR THIS ROLE</span>
-              <ArrowRight className="w-4 h-4" />
+              + Log First Application
             </button>
           </div>
-        ))}
+        ) : (
+          applications.map(app => (
+            <div key={app.id} className="p-5 rounded-2xl bg-[#0C1118] border border-[#1C2633] flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-3">
+                  <h3 className="font-mono font-bold text-base text-[#F3F5F7]">{app.company}</h3>
+                  <span className="px-2.5 py-0.5 rounded text-[10px] font-mono bg-[#35C6FF]/10 text-[#35C6FF] font-bold border border-[#35C6FF]/30">
+                    {app.matchScore}% MATCH FIT
+                  </span>
+                </div>
+                <div className="text-xs text-[#A7B0BC]">{app.role} • Applied {app.appliedDate}</div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="px-3 py-1 rounded-full text-xs font-mono bg-[#151D28] border border-[#1C2633] text-[#F3F5F7]">
+                  {app.stage}
+                </span>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
 };
 
-/* 3. COVER LETTER STUDIO */
+/* 2. COVER LETTER GENERATOR */
 export const CoverLetterPage: React.FC = () => {
   const { coverLetter, updateCoverLetter, showToast } = useCareer();
   const [content, setContent] = useState(coverLetter.content);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(content);
-    showToast("Cover Letter copied to clipboard");
+    showToast('Cover Letter copied to clipboard!');
   };
 
   return (
@@ -229,7 +175,7 @@ export const CoverLetterPage: React.FC = () => {
   );
 };
 
-/* 4. PORTFOLIO BUILDER */
+/* 3. PORTFOLIO BUILDER */
 export const PortfolioPage: React.FC = () => {
   const { profile } = useCareer();
 
@@ -247,16 +193,19 @@ export const PortfolioPage: React.FC = () => {
         <div className="space-y-2 border-b border-[#1C2633] pb-6">
           <h2 className="text-3xl font-bold text-[#F3F5F7]">{profile.name}</h2>
           <p className="text-sm text-[#35C6FF] font-mono">{profile.targetRole} • {profile.location}</p>
-          <p className="text-xs text-[#A7B0BC] max-w-2xl">{profile.bio}</p>
+          <p className="text-xs text-[#A7B0BC] max-w-2xl">{profile.careerGoal}</p>
         </div>
 
         <div className="space-y-4">
-          <h3 className="font-mono text-xs font-bold text-[#35C6FF] uppercase">FEATURED PROJECTS</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 rounded-xl bg-[#111822] border border-[#1C2633] space-y-2">
-              <h4 className="font-mono font-bold text-sm text-[#F3F5F7]">Real-Time Telemetry Dashboard</h4>
-              <p className="text-xs text-[#A7B0BC]">Interactive analytics application rendering live streaming metric graphs.</p>
-            </div>
+          <h3 className="font-mono text-xs font-bold text-[#35C6FF] uppercase">VERIFIED TECHNICAL SKILLS</h3>
+          <div className="flex flex-wrap gap-2">
+            {profile.skills.length > 0 ? profile.skills.map((s, idx) => (
+              <span key={idx} className="px-3 py-1 rounded bg-[#111822] border border-[#35C6FF]/30 text-xs font-mono text-[#35C6FF]">
+                ✓ {s}
+              </span>
+            )) : (
+              <span className="text-xs font-mono text-[#A7B0BC] italic">No verified skills recorded yet.</span>
+            )}
           </div>
         </div>
       </div>
@@ -264,116 +213,135 @@ export const PortfolioPage: React.FC = () => {
   );
 };
 
-/* 5. LINKEDIN OPTIMIZER */
-export const LinkedInPage: React.FC = () => {
-  const { linkedInOpt } = useCareer();
-
-  return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-8 animate-fade-in">
-      <div className="p-6 rounded-2xl bg-[#0C1118] border border-[#1C2633] space-y-1">
-        <div className="flex items-center gap-2 text-xs font-mono text-[#35C6FF]">
-          <Share2 className="w-4 h-4" />
-          AI LINKEDIN PROFILE OPTIMIZER
-        </div>
-        <h1 className="text-2xl font-bold font-mono text-[#F3F5F7]">HEADLINE & ABOUT ENHANCER</h1>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="p-6 rounded-2xl bg-[#0C1118] border border-[#1C2633] space-y-4">
-          <div className="text-xs font-mono text-[#66717F] uppercase">CURRENT HEADLINE</div>
-          <p className="text-xs text-[#A7B0BC] p-3 rounded-xl bg-[#111822]">{linkedInOpt.currentHeadline}</p>
-          <div className="text-xs font-mono text-[#66717F] uppercase">CURRENT ABOUT</div>
-          <p className="text-xs text-[#A7B0BC] p-3 rounded-xl bg-[#111822]">{linkedInOpt.currentAbout}</p>
-        </div>
-
-        <div className="p-6 rounded-2xl bg-[#0C1118] border border-[#35C6FF]/50 space-y-4 shadow-[0_0_20px_rgba(53,198,255,0.15)]">
-          <div className="text-xs font-mono text-[#35C6FF] font-bold uppercase">OPTIMIZED HEADLINE (+29% RECRUITER REACH)</div>
-          <p className="text-xs text-[#F3F5F7] font-semibold p-3 rounded-xl bg-[#151D28] border border-[#35C6FF]/40">{linkedInOpt.optimizedHeadline}</p>
-          <div className="text-xs font-mono text-[#35C6FF] font-bold uppercase">OPTIMIZED ABOUT SECTION</div>
-          <p className="text-xs text-[#F3F5F7] p-3 rounded-xl bg-[#151D28] border border-[#35C6FF]/40">{linkedInOpt.optimizedAbout}</p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/* 6. SETTINGS & PROFILE */
-/* 6. SETTINGS & PROFILE */
+/* 4. SETTINGS */
 export const SettingsPage: React.FC = () => {
-  const { theme, toggleTheme, clearMockData, resetMockData, showToast } = useCareer();
-  const [apiKey, setApiKey] = useState('sk-proj-••••••••••••••••••••');
+  const { profile, updateProfile, theme, setThemeMode } = useCareer();
+  const [name, setName] = useState(profile.name);
+  const [role, setRole] = useState(profile.targetRole);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateProfile({ name, targetRole: role });
+  };
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-8 animate-fade-in">
       <div className="p-6 rounded-2xl bg-[#0C1118] border border-[#1C2633] space-y-1">
         <div className="flex items-center gap-2 text-xs font-mono text-[#35C6FF]">
           <Settings className="w-4 h-4" />
-          SYSTEM SETTINGS & PREFERENCES
+          SYSTEM PREFERENCES
         </div>
-        <h1 className="text-2xl font-bold font-mono text-[#F3F5F7]">SAAS CONFIGURATION</h1>
+        <h1 className="text-2xl font-bold font-mono text-[#F3F5F7]">ACCOUNT & SYSTEM CONFIGURATION</h1>
       </div>
 
       <div className="bg-[#0C1118] border border-[#1C2633] rounded-2xl p-6 space-y-6">
-        
-        {/* Appearance Toggle */}
-        <div className="flex items-center justify-between pb-4 border-b border-[#1C2633]">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <h3 className="font-mono text-xs font-bold text-[#35C6FF] uppercase">USER PROFILE</h3>
           <div>
-            <h3 className="font-mono text-sm font-bold text-[#F3F5F7]">Visual Theme Mode</h3>
-            <p className="text-xs text-[#A7B0BC]">Toggle between Dark Mode (Primary) and Light Mode</p>
-          </div>
-          <button
-            onClick={toggleTheme}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#151D28] border border-[#1C2633] text-xs font-mono text-[#F3F5F7] hover:border-[#35C6FF]/40 transition-colors"
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4 text-[#F2B84B]" /> : <Moon className="w-4 h-4 text-[#4268D8]" />}
-            <span>{theme.toUpperCase()} MODE</span>
-          </button>
-        </div>
-
-        {/* API Key Config */}
-        <div className="space-y-2 pb-4 border-b border-[#1C2633]">
-          <h3 className="font-mono text-sm font-bold text-[#F3F5F7]">OpenAI LLM API Key (Optional)</h3>
-          <p className="text-xs text-[#A7B0BC]">Leave blank to use built-in intelligent fallback engine.</p>
-          <div className="flex gap-3">
+            <label className="block text-xs font-mono text-[#A7B0BC] mb-1">Full Name</label>
             <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              className="flex-1 bg-[#111822] border border-[#1C2633] rounded-xl px-4 py-2 text-xs font-mono text-[#F3F5F7]"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full bg-[#111822] border border-[#1C2633] rounded-xl px-4 py-2 text-xs text-[#F3F5F7] focus:border-[#35C6FF] focus:outline-none"
             />
-            <button
-              onClick={() => showToast("API Key Configured Successfully")}
-              className="px-4 py-2 bg-[#35C6FF] text-[#070A0F] font-mono font-bold text-xs rounded-xl"
-            >
-              SAVE KEY
-            </button>
           </div>
-        </div>
 
-        {/* Mock Data / Workspace Management */}
-        <div className="space-y-3 pt-2">
           <div>
-            <h3 className="font-mono text-sm font-bold text-[#F3F5F7]">Workspace & Mock Data Management</h3>
-            <p className="text-xs text-[#A7B0BC]">Clear sample mock data to start with a fresh candidate profile, or reload sample demo data anytime.</p>
+            <label className="block text-xs font-mono text-[#A7B0BC] mb-1">Target Engineering Role</label>
+            <input
+              type="text"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full bg-[#111822] border border-[#1C2633] rounded-xl px-4 py-2 text-xs text-[#F3F5F7] focus:border-[#35C6FF] focus:outline-none"
+            />
           </div>
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={clearMockData}
-              className="px-4 py-2 bg-[#F06A6A]/10 border border-[#F06A6A]/40 text-[#F06A6A] font-mono text-xs font-bold rounded-xl hover:bg-[#F06A6A]/20 transition-all flex items-center gap-2"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Clear Mock Data / Start Fresh</span>
-            </button>
-            <button
-              onClick={resetMockData}
-              className="px-4 py-2 bg-[#151D28] border border-[#35C6FF]/40 text-[#35C6FF] font-mono text-xs font-bold rounded-xl hover:bg-[#35C6FF]/10 transition-all flex items-center gap-2"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Load Sample Mock Data</span>
-            </button>
+
+          <button
+            type="submit"
+            className="px-5 py-2.5 rounded-xl bg-[#35C6FF] text-[#070A0F] font-mono font-bold text-xs"
+          >
+            Save Profile Settings
+          </button>
+        </form>
+
+        <div className="pt-6 border-t border-[#1C2633] space-y-4">
+          <h3 className="font-mono text-xs font-bold text-[#35C6FF] uppercase">THEME MODE</h3>
+          <div className="flex gap-3">
+            {(['dark', 'light', 'system'] as const).map(mode => (
+              <button
+                key={mode}
+                onClick={() => setThemeMode(mode)}
+                className={`px-4 py-2 rounded-xl border text-xs font-mono font-bold uppercase transition-all ${
+                  theme === mode
+                    ? 'bg-[#35C6FF]/10 border-[#35C6FF] text-[#35C6FF]'
+                    : 'bg-[#111822] border-[#1C2633] text-[#A7B0BC]'
+                }`}
+              >
+                {mode}
+              </button>
+            ))}
           </div>
         </div>
+      </div>
+    </div>
+  );
+};
 
+/* 5. JOB MATCHES PAGE */
+export const JobMatchesPage: React.FC = () => {
+  const { jobTargets, setActiveScreen } = useCareer();
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-8 space-y-8 animate-fade-in">
+      <div className="p-6 rounded-2xl bg-[#0C1118] border border-[#1C2633] space-y-1">
+        <h1 className="text-2xl font-bold font-mono text-[#F3F5F7]">JOB MATCH CONSTELLATION</h1>
+        <p className="text-xs text-[#A7B0BC]">Overview of active candidate target role matches.</p>
+      </div>
+
+      <div className="space-y-4">
+        {jobTargets.length === 0 ? (
+          <div className="p-8 rounded-xl bg-[#0C1118] border border-[#1C2633] text-center text-xs text-[#A7B0BC]">
+            No job targets created yet. Create a job target to calculate match ratings.
+          </div>
+        ) : (
+          jobTargets.map(j => (
+            <div key={j.id} className="p-5 rounded-xl bg-[#0C1118] border border-[#1C2633] flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-sm text-[#F3F5F7]">{j.title}</h3>
+                <p className="text-xs text-[#A7B0BC]">{j.company} • {j.location}</p>
+              </div>
+              <button
+                onClick={() => setActiveScreen('ats-console')}
+                className="px-3 py-1.5 rounded-lg bg-[#35C6FF] text-[#070A0F] font-mono text-xs font-bold"
+              >
+                ATS Analysis
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* 6. LINKEDIN OPTIMIZATION PAGE */
+export const LinkedInPage: React.FC = () => {
+  const { linkedInOpt } = useCareer();
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8 space-y-8 animate-fade-in">
+      <div className="p-6 rounded-2xl bg-[#0C1118] border border-[#1C2633] space-y-1">
+        <h1 className="text-2xl font-bold font-mono text-[#F3F5F7]">LINKEDIN PROFILE OPTIMIZATION</h1>
+        <p className="text-xs text-[#A7B0BC]">Keyword optimization for recruiter search visibility.</p>
+      </div>
+
+      <div className="p-6 rounded-2xl bg-[#0C1118] border border-[#1C2633] space-y-4">
+        <h3 className="text-xs font-mono font-bold text-[#35C6FF]">OPTIMIZED HEADLINE</h3>
+        <p className="p-3 rounded-xl bg-[#111822] text-xs text-[#F3F5F7] font-mono">{linkedInOpt.optimizedHeadline}</p>
+
+        <h3 className="text-xs font-mono font-bold text-[#35C6FF]">OPTIMIZED ABOUT SECTION</h3>
+        <p className="p-3 rounded-xl bg-[#111822] text-xs text-[#F3F5F7] font-mono">{linkedInOpt.optimizedAbout}</p>
       </div>
     </div>
   );

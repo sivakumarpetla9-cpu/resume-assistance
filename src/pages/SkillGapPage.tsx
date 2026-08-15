@@ -22,7 +22,7 @@ export const SkillGapPage: React.FC = () => {
             CANDIDATE ↔ TARGET ROLE SKILL GAPS
           </h1>
           <p className="text-xs text-[#A7B0BC]">
-            Compared against requirements for: <span className="font-mono text-[#35C6FF]">{activeJobTarget.title} — {activeJobTarget.company}</span>
+            Compared against requirements for: <span className="font-mono text-[#35C6FF]">{activeJobTarget ? `${activeJobTarget.title} — ${activeJobTarget.company}` : 'Target Role'}</span>
           </p>
         </div>
 

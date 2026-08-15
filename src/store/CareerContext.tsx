@@ -38,13 +38,13 @@ interface CareerContextType {
   roadmapSteps: LearningRoadmapStep[];
   verifySkill: (skillName: string) => Promise<void>;
   applications: ApplicationTrackerItem[];
-  addApplication: (app: Omit<ApplicationTrackerItem, 'id'>) => void;
+  addApplication: (app: Omit<ApplicationTrackerItem, 'id'>) => Promise<void>;
   coverLetter: CoverLetterData;
   updateCoverLetter: (content: string) => void;
   linkedInOpt: LinkedInOptimization;
   activeScreen: string;
   setActiveScreen: (screen: string) => void;
-  careerReadinessScore: number;
+  careerReadinessScore: number | null;
   toastMessage: string | null;
   showToast: (msg: string) => void;
   clearMockData: () => void;
@@ -52,38 +52,36 @@ interface CareerContextType {
   refreshDataFromBackend: () => Promise<void>;
 }
 
-// Initial Un-analyzed Default State
 const initialProfile: CandidateProfile = {
   name: "Candidate Profile",
-  targetRole: "Frontend Developer",
+  targetRole: "Software Engineer",
   experienceLevel: "Mid",
-  skills: ["React", "JavaScript", "Tailwind CSS", "REST APIs"],
-  location: "San Francisco, CA",
-  careerGoal: "Land a Senior Engineering role",
-  email: "candidate@example.com",
-  bio: "Candidate profile initialized for workspace tracking.",
+  skills: [],
+  location: "Remote / Onsite",
+  careerGoal: "Advance software engineering career",
+  email: "",
+  bio: "",
   verifiedExperience: [],
   resumeUploaded: false
 };
 
-const defaultJobTarget: JobTarget = {
-  id: "job-1",
-  title: "Frontend Developer",
-  company: "XYZ Technology",
-  location: "San Francisco, CA",
-  description: "We are seeking a Frontend Developer to build real-time web applications with React, TypeScript, and high-performance WebSockets.",
+const defaultFallbackJobTarget: JobTarget = {
+  id: "",
+  title: "Target Role",
+  company: "Target Company",
+  location: "Remote",
+  description: "Create a job target to begin personalized ATS analysis and skill gap tracking.",
   matchScore: 0,
   atsScore: 0,
-  requiredSkills: ["React", "TypeScript", "JavaScript", "Tailwind CSS", "WebSockets"],
-  preferredSkills: ["Jest", "Docker"],
+  requiredSkills: [],
+  preferredSkills: [],
   keywords: [],
-  responsibilities: ["Develop modern React UI components", "Optimize client-side performance"],
-  createdAt: "2026-08-15",
-  isPrimary: true
+  responsibilities: [],
+  createdAt: ""
 };
 
 const initialAtsDiagnostic: ATSDiagnostic = {
-  overallScore: null, // Un-analyzed initial state
+  overallScore: null,
   keywordScore: 0,
   skillsScore: 0,
   experienceScore: 0,
@@ -99,8 +97,8 @@ const initialAtsDiagnostic: ATSDiagnostic = {
 const initialTailoredResume: TailoredResumeVersion = {
   id: "res-v1",
   versionLabel: "V1 — Original Resume",
-  jobTargetId: "job-1",
-  summary: "Frontend Developer experienced in React, JavaScript, and responsive UI systems.",
+  jobTargetId: "",
+  summary: "Results-driven Software Engineer with experience building scalable web applications.",
   experience: [],
   projects: [],
   skills: [],
@@ -111,8 +109,8 @@ const initialTailoredResume: TailoredResumeVersion = {
 
 const initialInterviewSession: InterviewSession = {
   id: "int-session-1",
-  jobTargetId: "job-1",
-  jobTitle: "Frontend Developer — XYZ Company",
+  jobTargetId: "",
+  jobTitle: "Software Engineer",
   type: "Technical",
   difficulty: "Medium",
   status: "idle",
@@ -120,46 +118,46 @@ const initialInterviewSession: InterviewSession = {
   questions: [
     {
       id: "q1",
-      text: "How would you optimize a React application that is experiencing frame drops and slow rendering on large lists?",
+      text: "How would you optimize performance and component architecture in a production web application?",
       category: "Technical",
       difficulty: "Medium",
-      expectedConcepts: ["React.memo", "Virtualization", "Code Splitting"]
+      expectedConcepts: ["Memoization", "Code Splitting", "Virtualization"]
     }
   ],
   telemetry: {
-    wpm: 142,
+    wpm: 140,
     fillersCount: 2,
-    clarityPercentage: 88,
-    confidenceScore: 83,
+    clarityPercentage: 85,
+    confidenceScore: 82,
     paceStatus: "Optimal"
   },
   transcript: [],
   scoreBreakdown: {
-    technical: 78,
-    communication: 84,
-    confidence: 81,
-    structure: 76,
-    relevance: 82
+    technical: 80,
+    communication: 85,
+    confidence: 82,
+    structure: 80,
+    relevance: 83
   },
-  overallReadinessScore: 80
+  overallReadinessScore: 82
 };
 
 const initialCoverLetter: CoverLetterData = {
-  jobTargetId: "job-1",
-  company: "XYZ Technology",
-  role: "Frontend Developer",
-  content: `Dear Hiring Team at XYZ Technology,\n\nI am writing to express my strong enthusiasm for the Frontend Developer position.\n\nSincerely,\nCandidate`,
+  jobTargetId: "",
+  company: "Target Company",
+  role: "Software Engineer",
+  content: `Dear Hiring Team,\n\nI am writing to express my interest in the Software Engineer role.\n\nSincerely,\nCandidate`,
   tone: "Technical"
 };
 
 const initialLinkedInOpt: LinkedInOptimization = {
-  currentHeadline: "Frontend Developer | React & JavaScript",
-  optimizedHeadline: "Frontend Engineer | React, TypeScript, High-Performance UI Systems",
-  currentAbout: "Software developer building responsive web apps.",
-  optimizedAbout: "Frontend Engineer specializing in React and performance optimization.",
-  keywordScoreBefore: 62,
-  keywordScoreAfter: 91,
-  keyEnhancements: ["Added TypeScript & High-Performance UI keywords"]
+  currentHeadline: "Software Engineer",
+  optimizedHeadline: "Software Engineer | High-Performance UI & Distributed Systems",
+  currentAbout: "Software developer building responsive applications.",
+  optimizedAbout: "Engineered robust full-stack applications with modern web architecture.",
+  keywordScoreBefore: 65,
+  keywordScoreAfter: 92,
+  keyEnhancements: ["Added performance optimization and system architecture keywords"]
 };
 
 const CareerContext = createContext<CareerContextType | undefined>(undefined);
@@ -169,8 +167,8 @@ export const CareerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return (localStorage.getItem('stitch_theme') as 'dark' | 'light' | 'system') || 'dark';
   });
   const [profile, setProfile] = useState<CandidateProfile>(initialProfile);
-  const [jobTargets, setJobTargets] = useState<JobTarget[]>([defaultJobTarget]);
-  const [activeJobTargetId, setActiveJobTargetId] = useState<string>("job-1");
+  const [jobTargets, setJobTargets] = useState<JobTarget[]>([]);
+  const [activeJobTargetId, setActiveJobTargetId] = useState<string>("");
   const [atsDiagnostic, setAtsDiagnostic] = useState<ATSDiagnostic>(initialAtsDiagnostic);
   const [resumeVersion, setResumeVersion] = useState<TailoredResumeVersion>(initialTailoredResume);
   const [interviewSession, setInterviewSession] = useState<InterviewSession>(initialInterviewSession);
@@ -182,15 +180,14 @@ export const CareerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [activeScreen, setActiveScreen] = useState<string>('landing');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const activeJobTarget = jobTargets.find(j => j.id === activeJobTargetId) || jobTargets[0] || defaultJobTarget;
+  const activeJobTarget = jobTargets.find(j => j.id === activeJobTargetId) || jobTargets[0] || defaultFallbackJobTarget;
 
-  // Sync backend data on mount or authentication change
   const refreshDataFromBackend = async () => {
     const token = localStorage.getItem('stitch_access_token');
     if (!token) return;
 
     try {
-      // Load Me
+      // 1. Load User Me
       const me = await StitchAPI.getMe().catch(() => null);
       if (me) {
         setProfile(prev => ({
@@ -202,9 +199,18 @@ export const CareerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }));
       }
 
-      // Load Jobs
+      // 2. Load Profile & Verified Skills
+      const userProfile = await StitchAPI.getProfile().catch(() => null);
+      if (userProfile && userProfile.skills) {
+        setProfile(prev => ({
+          ...prev,
+          skills: userProfile.skills || []
+        }));
+      }
+
+      // 3. Load Job Targets
       const jobs = await StitchAPI.getJobs().catch(() => []);
-      if (Array.isArray(jobs) && jobs.length > 0) {
+      if (Array.isArray(jobs)) {
         const mappedJobs: JobTarget[] = jobs.map((j: any) => ({
           id: j.id,
           title: j.title,
@@ -220,19 +226,20 @@ export const CareerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           createdAt: j.created_at || "Just now"
         }));
         setJobTargets(mappedJobs);
-        if (!jobs.some((j: any) => j.id === activeJobTargetId)) {
+
+        if (mappedJobs.length > 0 && (!activeJobTargetId || !mappedJobs.some(j => j.id === activeJobTargetId))) {
           setActiveJobTargetId(mappedJobs[0].id);
         }
       }
 
-      // Load Skill Gaps
+      // 4. Load Skill Gaps
       const gaps = await StitchAPI.getSkillGaps().catch(() => []);
       if (Array.isArray(gaps)) {
         setSkillGaps(gaps.map((g: any) => ({
           id: g.id,
           skillName: g.skillName,
           status: g.status,
-          priority: g.priority,
+          priority: g.priority || 'HIGH',
           jobRequirement: g.jobRequirement,
           candidateEvidence: g.candidateEvidence,
           whyItMatters: g.whyItMatters,
@@ -242,7 +249,7 @@ export const CareerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         })));
       }
 
-      // Load Roadmap
+      // 5. Load Roadmap
       const rm = await StitchAPI.getRoadmap().catch(() => null);
       if (rm && Array.isArray(rm.items)) {
         setRoadmapSteps(rm.items.map((item: any) => ({
@@ -258,9 +265,24 @@ export const CareerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         })));
       }
 
-      // Load latest ATS Diagnostic for active job
-      if (activeJobTargetId) {
-        const atsData = await StitchAPI.getLatestATS(activeJobTargetId).catch(() => null);
+      // 6. Load Applications
+      const apps = await StitchAPI.getApplications().catch(() => []);
+      if (Array.isArray(apps)) {
+        setApplications(apps.map((a: any) => ({
+          id: a.id,
+          company: a.company,
+          role: a.role,
+          stage: a.stage,
+          appliedDate: a.appliedDate || a.applied_date,
+          matchScore: a.matchScore || a.match_score || 80,
+          notes: a.notes
+        })));
+      }
+
+      // 7. Load latest ATS Diagnostic for active job target
+      const currentTargetId = activeJobTargetId || (jobs.length > 0 ? jobs[0].id : null);
+      if (currentTargetId) {
+        const atsData = await StitchAPI.getLatestATS(currentTargetId).catch(() => null);
         if (atsData && atsData.status !== "not_analyzed" && atsData.overall_score !== undefined) {
           setAtsDiagnostic({
             overallScore: atsData.overall_score,
@@ -279,6 +301,8 @@ export const CareerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             })),
             guardrailAlerts: atsData.guardrail_alerts || []
           });
+        } else {
+          setAtsDiagnostic(initialAtsDiagnostic);
         }
       }
     } catch (err) {
@@ -290,7 +314,6 @@ export const CareerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     refreshDataFromBackend();
   }, [activeJobTargetId]);
 
-  // Sync theme
   useEffect(() => {
     const root = document.documentElement;
     let isDark = theme === 'dark';
@@ -326,98 +349,64 @@ export const CareerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const createJobTarget = async (targetData: { title: string; company: string; location: string; description: string }): Promise<JobTarget> => {
-    try {
-      const created = await StitchAPI.createJobTarget(targetData.title, targetData.company, targetData.location, targetData.description);
-      const newTarget: JobTarget = {
-        id: created.id,
-        title: created.title,
-        company: created.company,
-        location: created.location,
-        description: created.description,
-        matchScore: created.match_score || 0,
-        atsScore: created.ats_score || 0,
-        requiredSkills: ["React", "JavaScript", "TypeScript"],
-        preferredSkills: [],
-        keywords: [],
-        responsibilities: [],
-        createdAt: created.created_at || "Just now"
-      };
-      setJobTargets(prev => [newTarget, ...prev]);
-      setActiveJobTargetId(newTarget.id);
-      setAtsDiagnostic(initialAtsDiagnostic); // Reset to un-analyzed state for new job target
-      showToast(`Created Job Target: ${newTarget.title} at ${newTarget.company}`);
-      return newTarget;
-    } catch (err) {
-      showToast("Job Target created locally");
-      const localId = `job-${Date.now()}`;
-      const localTarget: JobTarget = {
-        id: localId,
-        title: targetData.title,
-        company: targetData.company,
-        location: targetData.location || "Remote",
-        description: targetData.description,
-        matchScore: 0,
-        atsScore: 0,
-        requiredSkills: ["React", "JavaScript"],
-        preferredSkills: [],
-        keywords: [],
-        responsibilities: [],
-        createdAt: "Just now"
-      };
-      setJobTargets(prev => [localTarget, ...prev]);
-      setActiveJobTargetId(localId);
-      setAtsDiagnostic(initialAtsDiagnostic);
-      return localTarget;
-    }
+    const created = await StitchAPI.createJobTarget(targetData.title, targetData.company, targetData.location, targetData.description);
+    const newTarget: JobTarget = {
+      id: created.id,
+      title: created.title,
+      company: created.company,
+      location: created.location,
+      description: created.description,
+      matchScore: created.match_score || 0,
+      atsScore: created.ats_score || 0,
+      requiredSkills: ["React", "JavaScript", "TypeScript"],
+      preferredSkills: [],
+      keywords: [],
+      responsibilities: [],
+      createdAt: created.created_at || "Just now"
+    };
+    setJobTargets(prev => [newTarget, ...prev]);
+    setActiveJobTargetId(newTarget.id);
+    setAtsDiagnostic(initialAtsDiagnostic);
+    showToast(`Created Job Target: ${newTarget.title} at ${newTarget.company}`);
+    return newTarget;
   };
 
   const runATSAnalysis = async (targetJobId?: string) => {
     const targetId = targetJobId || activeJobTargetId;
     if (!targetId) return;
 
-    try {
-      showToast("Executing real ATS diagnostic pipeline...");
-      const res = await StitchAPI.runATS(targetId);
+    showToast("Executing real ATS diagnostic pipeline...");
+    const res = await StitchAPI.runATS(targetId);
 
-      setAtsDiagnostic({
-        overallScore: res.overall_score,
-        keywordScore: res.keyword_score,
-        skillsScore: res.skills_score,
-        experienceScore: res.experience_score,
-        structureScore: res.structure_score,
-        languageScore: res.language_score,
-        matchedSkills: res.matched_keywords || [],
-        missingSkills: res.missing_keywords || [],
-        weakKeywords: res.weak_keywords || [],
-        structuralIssues: (res.structural_issues || []).map((si: any) => ({
-          severity: si.severity || 'medium',
-          issue: si.issue,
-          fixAction: si.fix_action || si.fixAction
-        })),
-        guardrailAlerts: res.guardrail_alerts || []
-      });
+    setAtsDiagnostic({
+      overallScore: res.overall_score,
+      keywordScore: res.keyword_score,
+      skillsScore: res.skills_score,
+      experienceScore: res.experience_score,
+      structureScore: res.structure_score,
+      languageScore: res.language_score,
+      matchedSkills: res.matched_keywords || [],
+      missingSkills: res.missing_keywords || [],
+      weakKeywords: res.weak_keywords || [],
+      structuralIssues: (res.structural_issues || []).map((si: any) => ({
+        severity: si.severity || 'medium',
+        issue: si.issue,
+        fixAction: si.fix_action || si.fixAction
+      })),
+      guardrailAlerts: res.guardrail_alerts || []
+    });
 
-      // Re-fetch updated Skill Gaps and Learning Roadmap
-      await refreshDataFromBackend();
-      showToast(`ATS Diagnostic Complete! Calculated Overall Score: ${res.overall_score}%`);
-    } catch (err) {
-      console.error("ATS analysis error:", err);
-      showToast(err instanceof Error ? err.message : "ATS analysis failed.");
-    }
+    await refreshDataFromBackend();
+    showToast(`ATS Diagnostic Complete! Calculated Overall Score: ${res.overall_score}%`);
   };
 
   const verifySkill = async (skillName: string) => {
-    try {
-      await StitchAPI.verifySkill(skillName);
-      if (!profile.skills.includes(skillName)) {
-        setProfile(prev => ({ ...prev, skills: [...prev.skills, skillName] }));
-      }
-      showToast(`Verified Skill: ${skillName}!`);
-      await refreshDataFromBackend();
-    } catch (err) {
-      showToast(`Verified Skill: ${skillName}`);
+    await StitchAPI.verifySkill(skillName);
+    if (!profile.skills.includes(skillName)) {
       setProfile(prev => ({ ...prev, skills: [...prev.skills, skillName] }));
     }
+    showToast(`Verified Skill: ${skillName}!`);
+    await refreshDataFromBackend();
   };
 
   const updateResumeSection = (section: string, newContent: any) => {
@@ -441,7 +430,7 @@ export const CareerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       status: 'active',
       currentQuestionIndex: 0,
       transcript: [
-        { speaker: 'AI', text: `Starting ${type} interview (${difficulty} difficulty) for ${activeJobTarget.title} at ${activeJobTarget.company}. First question coming up...`, timestamp: new Date().toLocaleTimeString() },
+        { speaker: 'AI', text: `Starting ${type} interview (${difficulty} difficulty) for ${activeJobTarget.title}. First question coming up...`, timestamp: new Date().toLocaleTimeString() },
         { speaker: 'AI', text: prev.questions[0].text, timestamp: new Date().toLocaleTimeString() }
       ]
     }));
@@ -470,13 +459,19 @@ export const CareerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     showToast("Interview Session Completed — Report Generated");
   };
 
-  const addApplication = (app: Omit<ApplicationTrackerItem, 'id'>) => {
+  const addApplication = async (appData: Omit<ApplicationTrackerItem, 'id'>) => {
+    const created = await StitchAPI.createApplication(appData.company, appData.role, appData.stage, appData.appliedDate);
     const newApp: ApplicationTrackerItem = {
-      id: `app-${Date.now()}`,
-      ...app
+      id: created.id,
+      company: created.company,
+      role: created.role,
+      stage: created.stage,
+      appliedDate: created.appliedDate || created.applied_date,
+      matchScore: created.matchScore || 80,
+      notes: created.notes
     };
     setApplications(prev => [newApp, ...prev]);
-    showToast(`Added Application: ${app.company}`);
+    showToast(`Added Application: ${appData.company}`);
   };
 
   const updateCoverLetter = (content: string) => {
@@ -485,18 +480,7 @@ export const CareerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const clearMockData = () => {
-    setProfile({
-      name: "New Candidate",
-      targetRole: "Software Engineer",
-      experienceLevel: "Mid",
-      skills: [],
-      location: "Remote / Onsite",
-      careerGoal: "Define your targeted engineering role and objectives.",
-      email: "candidate@example.com",
-      bio: "Candidate profile initialized.",
-      verifiedExperience: [],
-      resumeUploaded: false
-    });
+    setProfile(initialProfile);
     setJobTargets([]);
     setAtsDiagnostic(initialAtsDiagnostic);
     setSkillGaps([]);
@@ -515,9 +499,9 @@ export const CareerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         ((activeJobTarget?.matchScore || 70) * 0.35) +
         (atsDiagnostic.overallScore * 0.25) +
         ((interviewSession.overallReadinessScore || 80) * 0.20) +
-        ((profile.skills.length > 5 ? 88 : 70) * 0.20)
+        ((profile.skills.length > 3 ? 90 : profile.skills.length * 20) * 0.20)
       )
-    : 0;
+    : null;
 
   return (
     <CareerContext.Provider value={{
